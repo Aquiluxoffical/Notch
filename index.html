@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>iPhone 13 Dynamic Island</title>
+  <style>
+    :root {
+      --spring-easing: cubic-bezier(0.32, 1.35, 0.45, 1);
+      --island-top: 14px;
+    }
+
+    body.notch-offset {
+      --island-top: 52px; /* Shifts below the physical iPhone 13 notch in fullscreen mode */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(145deg, #0f172a 0%, #1e1b4b 50%, #311042 100%);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 130px 20px 40px;
+      overflow-x: hidden;
+    }
+
+    /* Dynamic Island Container */
+    .island-wrapper {
+      position: fixed;
+      top: var(--island-top);
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      z-index: 9999;
+      transition: top 0.35s var(--spring-easing);
+      pointer-events: none;
+    }
+
+    .dynamic-island {
+      pointer-events: auto;
+      background: #000;
+      color: #fff;
+      border-radius: 40px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      transition: width 0.48s var(--spring-easing), height 0.48s var(--spring-easing), border-radius 0.48s var(--spring-easing);
+      cursor: pointer;
+    }
+
+    /* Island States */
+    .dynamic-island.state-idle { width: 122px; height: 35px; border-radius: 20px; }
+    .dynamic-island.state-compact { width: 215px; height: 38px; border-radius: 22px; }
+    .dynamic-island.state-expanded-music { width: 355px; height: 178px; border-radius: 38px; }
+    .dynamic-island.state-expanded-call { width: 355px; height: 96px; border-radius: 36px; }
+    .dynamic-island.state-expanded-timer { width: 355px; height: 104px; border-radius: 36px; }
+    .dynamic-island.state-expanded-battery { width: 330px; height: 64px; border-radius: 32px; }
+
+    /* Layers inside Island */
+    .layer {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      display: flex;
+      align-items: center;
+    }
+
+    .layer.active {
+      opacity: 1;
+      pointer-events: auto;
+      transition-delay: 0.12s;
+    }
+
+    /* Idle Camera Lens */
+    .layer-idle {
+      justify-content: flex-end;
+      padding-right: 14px;
+    }
+    .camera-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #25335a, #090d16 70%);
+      box-shadow: inset 0 0 2px rgba(255,255,255,0.25);
+    }
+
+    /* Compact View */
+    .layer-compact {
+      justify-content: space-between;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .compact-left, .compact-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mini-art {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    /* Equalizer Bars */
+    .eq {
+      display: flex;
+      align-items: flex-end;
+      gap: 2.5px;
+      height: 14px;
+    }
+    .eq span {
+      width: 3px;
+      background: #a855f7;
+      border-radius: 2px;
+      animation: bounce 0.8s infinite ease-in-out alternate;
+    }
+    .eq.paused span { animation-play-state: paused; }
+    .eq span:nth-child(1) { height: 60%; animation-delay: 0.1s; }
+    .eq span:nth-child(2) { height: 100%; animation-delay: 0.3s; }
+    .eq span:nth-child(3) { height: 45%; animation-delay: 0.2s; }
+    .eq span:nth-child(4) { height: 80%; animation-delay: 0.4s; }
+    @keyframes bounce {
+      0% { height: 25%; }
+      100% { height: 100%; }
+    }
+
+    /* Expanded Music */
+    .layer-music {
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 18px 20px;
+    }
+    .music-top {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .album-cover {
+      width: 54px;
+      height: 54px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    .track-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .track-title {
+      font-size: 15px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-artist {
+      font-size: 13px;
+      color: #9ca3af;
+      margin-top: 2px;
+    }
+    .progress-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      color: #9ca3af;
+    }
+    .progress-bar {
+      flex: 1;
+      height: 5px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      width: 38%;
+      height: 100%;
+      background: #fff;
+      border-radius: 3px;
+      transition: width 0.3s linear;
+    }
+    .music-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 34px;
+      width: 100%;
+    }
+    .ctrl-btn {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
+    }
+
+    /* Expanded Call */
+    .layer-call {
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+    .caller-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .caller-text .sub {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .caller-text .name {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .call-actions {
+      display: flex;
+      gap: 12px;
+    }
+    .call-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-decline { background: #ef4444; }
+    .btn-accept { background: #22c55e; }
+
+    /* Expanded Timer */
+    .layer-timer {
+      justify-content: space-between;
+      padding: 0 22px;
+    }
+    .timer-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .timer-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(245, 158, 11, 0.25);
+      color: #fbbf24;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .timer-digits {
+      font-size: 32px;
+      font-weight: 700;
+      color: #fbbf24;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Expanded Battery */
+    .layer-battery {
+      justify-content: space-between;
+      padding: 0 22px;
+      font-weight: 600;
+    }
+    .battery-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #4ade80;
+    }
+
+    /* Phone Dashboard Controls */
+    .dashboard {
+      width: 100%;
+      max-width: 370px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 28px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .dashboard h2 {
+      font-size: 18px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    .dashboard p {
+      font-size: 13px;
+      color: #cbd5e1;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .grid-btns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .action-btn {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      padding: 13px 12px;
+      border-radius: 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.2s;
+    }
+
+    .action-btn:active {
+      transform: scale(0.96);
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.12);
+      font-size: 13px;
+    }
+
+    .switch {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .switch.on {
+      background: #22c55e;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Island -->
+  <div class="island-wrapper">
+    <div id="island" class="dynamic-island state-idle" onclick="handleIslandTap(event)">
+      
+      <!-- Idle State -->
+      <div id="layer-idle" class="layer layer-idle active">
+        <div class="camera-dot"></div>
+      </div>
+
+      <!-- Compact Pill State -->
+      <div id="layer-compact" class="layer layer-compact">
+        <div class="compact-left" id="compact-left">
+          <div class="mini-art">🎵</div>
+        </div>
+        <div class="compact-right" id="compact-right">
+          <div class="eq" id="compact-eq">
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expanded Music State -->
+      <div id="layer-music" class="layer layer-music">
+        <div class="music-top">
+          <div class="album-cover" id="music-cover">🎵</div>
+          <div class="track-info">
+            <div class="track-title" id="track-title">Starboy</div>
+            <div class="track-artist" id="track-artist">The Weeknd • Daft Punk</div>
+          </div>
+          <div class="eq" id="expanded-eq">
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="progress-row">
+          <span id="cur-time">1:14</span>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+          <span>3:50</span>
+        </div>
+        <div class="music-controls" onclick="event.stopPropagation()">
+          <button class="ctrl-btn" onclick="changeTrack(-1)">⏮</button>
+          <button class="ctrl-btn" id="play-btn" onclick="togglePlay()">⏸</button>
+          <button class="ctrl-btn" onclick="changeTrack(1)">⏭</button>
+        </div>
+      </div>
+
+      <!-- Expanded Incoming Call State -->
+      <div id="layer-call" class="layer layer-call">
+        <div class="caller-info">
+          <div class="avatar">A</div>
+          <div class="caller-text">
+            <div class="sub" id="call-status">iPhone • Incoming Call</div>
+            <div class="name">Alex Rivera</div>
+          </div>
+        </div>
+        <div class="call-actions" onclick="event.stopPropagation()">
+          <button class="call-btn btn-decline" onclick="setActivity('idle')">✕</button>
+          <button class="call-btn btn-accept" onclick="acceptCall()">✓</button>
+        </div>
+      </div>
+
+      <!-- Expanded Timer State -->
+      <div id="layer-timer" class="layer layer-timer">
+        <div class="timer-left" onclick="event.stopPropagation()">
+          <button class="timer-btn" id="timer-toggle" onclick="toggleTimer()">⏸</button>
+          <button class="timer-btn" onclick="setActivity('idle')">✕</button>
+        </div>
+        <div class="timer-digits" id="timer-display">01:00</div>
+      </div>
+
+      <!-- Expanded Battery State -->
+      <div id="layer-battery" class="layer layer-battery">
+        <span>Charging</span>
+        <div class="battery-pill">
+          <span>⚡ 85%</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="text-align:center; margin-top: 20px;">
+    <h1 style="font-size: 46px; font-weight: 700;" id="clock">9:41</h1>
+    <p style="opacity: 0.75; font-size: 15px;">Tap the Dynamic Island to expand or collapse</p>
+  </div>
+
+  <!-- Control Panel -->
+  <div class="dashboard">
+    <h2>Dynamic Island Controls</h2>
+    <p>Trigger live activities below, then tap the pill at the top.</p>
+    <div class="grid-btns">
+      <button class="action-btn" onclick="setActivity('music')">🎵 Music Player</button>
+      <button class="action-btn" onclick="setActivity('call')">📞 Incoming Call</button>
+      <button class="action-btn" onclick="setActivity('timer')">⏱️ Live Timer</button>
+      <button class="action-btn" onclick="setActivity('battery')">🔋 Charging</button>
+    </div>
+    <button class="action-btn" style="width:100%" onclick="setActivity('idle')">Reset to Idle Cutout</button>
+
+    <div class="toggle-row">
+      <span>iPhone 13 Notch Offset</span>
+      <button id="notch-btn" class="switch" onclick="toggleNotchOffset()">Off</button>
+    </div>
+  </div>
+
+  <script>
+    const island = document.getElementById('island');
+    const layers = {
+      idle: document.getElementById('layer-idle'),
+      compact: document.getElementById('layer-compact'),
+      music: document.getElementById('layer-music'),
+      call: document.getElementById('layer-call'),
+      timer: document.getElementById('layer-timer'),
+      battery: document.getElementById('layer-battery')
+    };
+
+    let currentActivity = 'idle'; 
+    let isExpanded = false;
+    let isPlaying = true;
+    let progress = 32;
+    let trackIndex = 0;
+    let timerSeconds = 60;
+    let timerRunning = true;
+
+    const tracks = [
+      { title: "Starboy", artist: "The Weeknd • Daft Punk", icon: "🎵" },
+      { title: "Midnight City", artist: "M83 • Hurry Up, We're Dreaming", icon: "🌆" },
+      { title: "Blinding Lights", artist: "The Weeknd • After Hours", icon: "✨" }
+    ];
+
+    function showLayer(name) {
+      Object.values(layers).forEach(el => el.classList.remove('active'));
+      if (layers[name]) layers[name].classList.add('active');
+    }
+
+    function updateCompactContent() {
+      const left = document.getElementById('compact-left');
+      const right = document.getElementById('compact-right');
+      if (currentActivity === 'music') {
+        left.innerHTML = `<div class="mini-art">${tracks[trackIndex].icon}</div>`;
+        right.innerHTML = `<div class="eq ${isPlaying ? '' : 'paused'}"><span></span><span></span><span></span><span></span></div>`;
+      } else if (currentActivity === 'call') {
+        left.innerHTML = `<span style="color:#22c55e">📞 0:14</span>`;
+        right.innerHTML = `<span style="color:#22c55e;font-size:12px;">Alex</span>`;
+      } else if (currentActivity === 'timer') {
+        left.innerHTML = `<span style="color:#fbbf24">⏱️</span>`;
+        right.innerHTML = `<span style="color:#fbbf24;font-variant-numeric:tabular-nums" id="compact-timer">${formatTime(timerSeconds)}</span>`;
+      } else if (currentActivity === 'battery') {
+        left.innerHTML = `<span style="color:#4ade80">⚡ Charging</span>`;
+        right.innerHTML = `<span style="color:#4ade80">85%</span>`;
+      }
+    }
+
+    function setActivity(activity) {
+      currentActivity = activity;
+      if (activity === 'idle') {
+        isExpanded = false;
+        island.className = 'dynamic-island state-idle';
+        showLayer('idle');
+        return;
+      }
+
+      if (activity === 'battery') {
+        isExpanded = true;
+        island.className = 'dynamic-island state-expanded-battery';
+        showLayer('battery');
+        setTimeout(() => {
+          if (currentActivity === 'battery') collapseToCompact();
+        }, 2400);
+        return;
+      }
+
+      if (activity === 'call') {
+        document.getElementById('call-status').textContent = 'iPhone • Incoming Call';
+        expandCurrent();
+        return;
+      }
+
+      collapseToCompact();
+    }
+
+    function expandCurrent() {
+      if (currentActivity === 'idle') return;
+      isExpanded = true;
+      island.className = `dynamic-island state-expanded-${currentActivity}`;
+      showLayer(currentActivity);
+    }
+
+    function collapseToCompact() {
+      if (currentActivity === 'idle') return;
+      isExpanded = false;
+      updateCompactContent();
+      island.className = 'dynamic-island state-compact';
+      showLayer('compact');
+    }
+
+    function handleIslandTap(e) {
+      if (currentActivity === 'idle') {
+        setActivity('music');
+        return;
+      }
+      if (isExpanded) {
+        collapseToCompact();
+      } else {
+        expandCurrent();
+      }
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶️';
+      document.getElementById('expanded-eq').classList.toggle('paused', !isPlaying);
+      updateCompactContent();
+    }
+
+    function changeTrack(dir) {
+      trackIndex = (trackIndex + dir + tracks.length) % tracks.length;
+      document.getElementById('track-title').textContent = tracks[trackIndex].title;
+      document.getElementById('track-artist').textContent = tracks[trackIndex].artist;
+      document.getElementById('music-cover').textContent = tracks[trackIndex].icon;
+      progress = 10;
+      document.getElementById('progress-fill').style.width = progress + '%';
+      updateCompactContent();
+    }
+
+    function acceptCall() {
+      document.getElementById('call-status').textContent = 'Connected • 00:01';
+      setTimeout(() => collapseToCompact(), 600);
+    }
+
+    function toggleTimer() {
+      timerRunning = !timerRunning;
+      document.getElementById('timer-toggle').textContent = timerRunning ? '⏸' : '▶️';
+    }
+
+    function formatTime(sec) {
+      const m = String(Math.floor(sec / 60)).padStart(2, '0');
+      const s = String(sec % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function toggleNotchOffset() {
+      const active = document.body.classList.toggle('notch-offset');
+      const btn = document.getElementById('notch-btn');
+      btn.textContent = active ? 'On' : 'Off';
+      btn.classList.toggle('on', active);
+    }
+
+    // Live Loops for Timer, Music Progress, and Clock
+    setInterval(() => {
+      if (isPlaying && currentActivity === 'music') {
+        progress = (progress + 1) % 100;
+        document.getElementById('progress-fill').style.width = progress + '%';
+      }
+      if (timerRunning && currentActivity === 'timer') {
+        timerSeconds = timerSeconds > 0 ? timerSeconds - 1 : 60;
+        const formatted = formatTime(timerSeconds);
+        document.getElementById('timer-display').textContent = formatted;
+        const compactTimer = document.getElementById('compact-timer');
+        if (compactTimer) compactTimer.textContent = formatted;
+      }
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    }, 1000);
+  </script>
+</body>
+</html>
